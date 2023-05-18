@@ -3,11 +3,17 @@ import numpy as np
 
 class Activation:
 
-    def __init__(self):
+    def __init__(self, act_func='tanh'):
         self.input = None
         self.output = None
         self.activation = None
         self.activation_prime = None
+        self.set_act_funcs(act_func)
+
+    def set_act_funcs(self, act_func):
+        if act_func == 'tanh':
+            self.activation = lambda x: np.tanh(x)
+            self.activation_prime = lambda x: 1 - np.tanh(x) ** 2
 
     def set_tanh(self):
         self.activation = lambda x: np.tanh(x)
@@ -44,14 +50,16 @@ class Network:
 
     def __init__(self):
         self.layers = []
+        self.outputs = []
 
     def add_layer(self, layer):
         self.layers.append(layer)
 
-    def forward(self, input):
-        output = None
+    def forward(self, input):  # this method works but needs work
+        self.outputs = []
         for layer in self.layers:
             output = layer.forward(input)
+            self.outputs.append(output)
             input = output
         return output
 
@@ -71,7 +79,7 @@ class Trainer:
         return 2 * (y_pred - y_true) / np.size(y_true)
 
     def backward(self, gradient, learning_rate):
-        for layer in reversed(self.nn):
+        for layer in reversed(self.nn.layers):
             gradient = layer.backward(gradient, learning_rate)
 
     def train(self, learning_rate, epochs):
@@ -93,12 +101,12 @@ if __name__ == "__main__":
 
     X = np.array([[[0], [0]], [[0], [1]], [[1], [0]], [[1], [1]]])
     Y = np.array([[[0]], [[1]], [[1]], [[0]]])
-    training_samples = np.concatenate((X, Y), axis=2)
+    samples = np.array(list(zip(X, Y)), dtype=object)
 
     nn = Network()
     nn.add_layer(Dense(2, 3))
-    nn.add_layer(Activation().set_tanh())
+    nn.add_layer(Activation('tanh'))
     nn.add_layer(Dense(3, 1))
-    nn.add_layer(Activation().set_tanh())
+    nn.add_layer(Activation('tanh'))
 
-    Trainer(nn, training_samples).train(0.1, 10000)
+    Trainer(nn, samples).train(0.1, 10000)
