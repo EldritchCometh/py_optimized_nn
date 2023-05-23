@@ -50,18 +50,19 @@ class Network:
 
     def __init__(self):
         self.layers = []
-        self.outputs = []
+        self.input = None
+        self.output = None
 
     def add_layer(self, layer):
         self.layers.append(layer)
 
-    def forward(self, input):  # this method works but needs work
-        self.outputs = []
-        for layer in self.layers:
-            output = layer.forward(input)
-            self.outputs.append(output)
-            input = output
-        return output
+    def forward(self, input):
+        if not np.array_equal(input, self.input):
+            self.input = input
+            self.output = np.expand_dims(input, -1)
+            for layer in self.layers:
+                self.output = layer.forward(self.output)
+        return self.output
 
 
 class Trainer:
@@ -70,13 +71,11 @@ class Trainer:
         self.nn = network
         self.samples = training_samples
 
-    @staticmethod
-    def mse(y_true, y_pred):
-        return np.mean(np.power(y_true - y_pred, 2))
+    def mse(self, y_true):
+        return np.mean(np.power(y_true - self.nn.output, 2))
 
-    @staticmethod
-    def mse_prime(y_true, y_pred):
-        return 2 * (y_pred - y_true) / np.size(y_true)
+    def mse_prime(self, y_true):
+        return 2 * (self.nn.output - y_true) / np.size(y_true)
 
     def backward(self, gradient, learning_rate):
         for layer in reversed(self.nn.layers):
@@ -85,13 +84,11 @@ class Trainer:
     def train(self, learning_rate, epochs):
         for e in range(epochs):
             error = 0
-            samples = self.samples
-            np.random.shuffle(samples)
-            for sample in samples:
-                features, targets = sample
-                output = self.nn.forward(features)
-                error += self.mse(targets, output)
-                output_gradient = self.mse_prime(targets, output)
+            np.random.shuffle(self.samples)
+            for (features, targets) in self.samples:
+                self.nn.forward(features)
+                error += self.mse(targets)
+                output_gradient = self.mse_prime(targets)
                 self.backward(output_gradient, learning_rate)
             error /= len(X)
             print('%d/%d, error=%f' % (e + 1, epochs, error))
@@ -99,8 +96,8 @@ class Trainer:
 
 if __name__ == "__main__":
 
-    X = np.array([[[0], [0]], [[0], [1]], [[1], [0]], [[1], [1]]])
-    Y = np.array([[[0]], [[1]], [[1]], [[0]]])
+    X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
+    Y = np.array([[0], [1], [1], [0]])
     samples = np.array(list(zip(X, Y)), dtype=object)
 
     nn = Network()
@@ -109,4 +106,4 @@ if __name__ == "__main__":
     nn.add_layer(Dense(3, 1))
     nn.add_layer(Activation('tanh'))
 
-    Trainer(nn, samples).train(0.1, 10000)
+    Trainer(nn, samples).train(0.1, 1000)
