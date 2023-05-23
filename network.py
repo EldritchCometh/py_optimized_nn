@@ -103,7 +103,7 @@ if __name__ == "__main__":
     nn = Network()
     nn.add_layer(Dense(2, 3))
     nn.add_layer(Activation('tanh'))
-    nn.add_layer(Dense(3, 1))
+    nn.add_layer(Dense(3, 2))
     nn.add_layer(Activation('tanh'))
 
     Trainer(nn, samples).train(0.1, 1000)
