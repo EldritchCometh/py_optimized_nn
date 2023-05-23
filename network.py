@@ -64,7 +64,7 @@ def mse_prime(y_true, y_pred):
 dense = Dense(3, 3)
 print(dense.forward([0.5, 0.5, 0.5]))
 
-X = np.reshape([[[0], [0]], [[0], [1]], [[1], [0]], [[1], [1]]], (4, 2, 1))
+X = np.reshape([[0, 0], [0, 1], [1, 0], [1, 1]], (4, 2, 1))
 Y = np.reshape([[0], [1], [1], [0]], (4, 1, 1))
 
 network = [
