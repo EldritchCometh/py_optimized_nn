@@ -39,6 +39,7 @@ class Network:
         self.layers = structure
 
     def forward(self, input):
+        input = np.expand_dims(input, -1)
         for layer in self.layers:
             input = layer.forward(input)
         return input
@@ -65,7 +66,7 @@ class Trainer:
             error = 0
             random.shuffle(self.dataset)
             for x, y in self.dataset:
-                x = np.expand_dims(x, -1)
+                # x = np.expand_dims(x, -1)
                 y = np.expand_dims(y, -1)
                 y_pred = self.nn.forward(x)
                 error += self.mse(y_pred, y)
@@ -85,4 +86,4 @@ nn = Network(
     Dense(3, 1),
     Tanh())
 trainer = Trainer(nn, dataset)
-trainer.train(0.1, 1000)
+trainer.train(0.1, 5000)
