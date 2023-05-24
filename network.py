@@ -1,4 +1,6 @@
+import gzip
 import random
+import pickle
 import numpy as np
 
 
@@ -77,9 +79,22 @@ class Trainer:
 def xor_dataset():
     xor_X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
     xor_Y = np.array([[0, 0], [1, 1], [1, 1], [0, 0]])
-    return list(zip(xor_X, xor_Y))
+    return list(zip(xor_X, xor_Y)), list(zip(xor_X, xor_Y))
 
 
+def mnist_dataset():
+    with gzip.open('mnist_data.pkl.gz', 'rb') as f:
+        X_train, y_train, X_test, y_test = pickle.load(f)
+    return list(zip(X_train, y_train)), list(zip(X_test, y_test))
+
+
+xor_train, xor_test = xor_dataset()
+mnist_train, mnist_test = mnist_dataset()
+print(len(xor_train))
+print(len(mnist_train[0]))
+
+
+'''
 nn = Network(
     Dense(2, 3),
     Tanh(),
@@ -87,3 +102,4 @@ nn = Network(
     Tanh())
 trainer = Trainer(nn, xor_dataset())
 trainer.train(0.1, 5000)
+'''

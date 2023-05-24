@@ -16,7 +16,11 @@ y_combined = [[float(i == int(y)) for i in range(10)] for y in y_combined]
 X_train, y_train = np.array(X_combined[:60000]), np.array(y_combined[:60000])
 X_test, y_test = np.array(X_combined[60000:]), np.array(y_combined[60000:])
 
+# Zip each feature set together with its target value
+training_dataset = list(zip(X_train, y_train))
+testing_dataset = list(zip(X_test, y_test))
+
 # Dump it to the pickle
-data = (X_train, y_train, X_test, y_test)
+data = (training_dataset, testing_dataset)
 with gzip.open("mnist_data.pkl.gz", 'wb') as f:
     pickle.dump(data, f)
