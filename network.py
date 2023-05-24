@@ -1,3 +1,4 @@
+import random
 import numpy as np
 
 
@@ -34,48 +35,54 @@ class Dense:
 
 class Network:
 
-    def __init__(self):
-        self.layers = [
-            Dense(2, 3),
-            Tanh(),
-            Dense(3, 2),
-            Tanh(),
-        ]
+    def __init__(self, *structure):
+        self.layers = structure
 
     def forward(self, input):
         for layer in self.layers:
             input = layer.forward(input)
         return input
 
-    def backward(self, gradient, learning_rate):
-        for layer in reversed(self.layers):
-            gradient = layer.backward(gradient, learning_rate)
-
 
 class Trainer:
 
-    def mse(self, y_true, y_pred):
+    def __init__(self, neural_network, dataset):
+        self.nn = neural_network
+        self.dataset = dataset
+
+    def mse(self, y_pred, y_true):
         return np.mean(np.power(y_true - y_pred, 2))
 
-    def mse_prime(self, y_true, y_pred):
+    def mse_prime(self, y_pred, y_true):
         return 2 * (y_pred - y_true) / np.size(y_true)
 
-    def train(self):
-        epochs = 1000
-        learning_rate = 0.1
+    def backward(self, gradient, learning_rate):
+        for layer in reversed(self.nn.layers):
+            gradient = layer.backward(gradient, learning_rate)
+
+    def train(self, learning_rate, epochs):
         for e in range(epochs):
             error = 0
-            for x, y in zip(X, Y):
-                output = nn.forward(x)
-                error += self.mse(y, output)
-                gradient = self.mse_prime(y, output)
-                nn.backward(gradient, learning_rate)
-            error /= len(X)
+            random.shuffle(self.dataset)
+            for x, y in self.dataset:
+                x = np.expand_dims(x, -1)
+                y = np.expand_dims(y, -1)
+                y_pred = self.nn.forward(x)
+                error += self.mse(y_pred, y)
+                gradient = self.mse_prime(y_pred, y)
+                self.backward(gradient, learning_rate)
+            error /= len(self.dataset)
             print('%d/%d, error=%f' % (e + 1, epochs, error))
 
 
-X = np.reshape([[0, 0], [0, 1], [1, 0], [1, 1]], (4, 2, 1))
-Y = np.reshape([[0, 0], [1, 1], [1, 1], [0, 0]], (4, 2, 1))
+X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
+Y = np.array([[0], [1], [1], [0]])
+dataset = list(zip(X, Y))
 
-nn = Network()
-Trainer().train()
+nn = Network(
+    Dense(2, 3),
+    Tanh(),
+    Dense(3, 1),
+    Tanh())
+trainer = Trainer(nn, dataset)
+trainer.train(0.1, 1000)
