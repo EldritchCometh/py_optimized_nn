@@ -55,7 +55,7 @@ class Trainer:
         return np.mean(np.power(y_true - y_pred, 2))
 
     def mse_prime(self, y_pred, y_true):
-        return 2 * (y_pred - y_true) / np.size(y_true)
+        return 2 * (y_pred - np.expand_dims(y_true, -1)) / np.size(y_true)
 
     def backward(self, gradient, learning_rate):
         for layer in reversed(self.nn.layers):
@@ -65,25 +65,25 @@ class Trainer:
         for e in range(epochs):
             error = 0
             random.shuffle(self.dataset)
-            for x, y in self.dataset:
-                # x = np.expand_dims(x, -1)
-                y = np.expand_dims(y, -1)
+            for x, y_true in self.dataset:
                 y_pred = self.nn.forward(x)
-                error += self.mse(y_pred, y)
-                gradient = self.mse_prime(y_pred, y)
+                error += self.mse(y_pred, y_true)
+                gradient = self.mse_prime(y_pred, y_true)
                 self.backward(gradient, learning_rate)
             error /= len(self.dataset)
             print('%d/%d, error=%f' % (e + 1, epochs, error))
 
 
-X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
-Y = np.array([[0], [1], [1], [0]])
-dataset = list(zip(X, Y))
+def xor_dataset():
+    xor_X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
+    xor_Y = np.array([[0, 0], [1, 1], [1, 1], [0, 0]])
+    return list(zip(xor_X, xor_Y))
+
 
 nn = Network(
     Dense(2, 3),
     Tanh(),
-    Dense(3, 1),
+    Dense(3, 2),
     Tanh())
-trainer = Trainer(nn, dataset)
+trainer = Trainer(nn, xor_dataset())
 trainer.train(0.1, 5000)
