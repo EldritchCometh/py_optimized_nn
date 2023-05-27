@@ -24,3 +24,6 @@ testing_dataset = list(zip(X_test, y_test))
 data = (training_dataset, testing_dataset)
 with gzip.open("mnist_data.pkl.gz", 'wb') as f:
     pickle.dump(data, f)
+
+
+
