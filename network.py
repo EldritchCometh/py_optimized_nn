@@ -150,6 +150,8 @@ class Trainer:
         self.nn = neural_network
         self.ev = evaluator
         self.dataset = training_set
+        self.reports = True
+        self.log_results = False
 
     @staticmethod
     def cross_entropy_loss_prime(y_pred, y_true):
