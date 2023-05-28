@@ -5,7 +5,6 @@ import pickle
 import logging
 import os
 import time
-import hashlib
 
 
 class Activation:
@@ -14,38 +13,31 @@ class Activation:
         self.activation, self.activation_prime = activation_functions
 
     @staticmethod
-    def get_relu():
+    def relu():
         activation = lambda x: np.maximum(0, x)
         activation_prime = lambda x: np.where(x > 0, 1, 0)
         return activation, activation_prime
 
     @staticmethod
-    def get_tanh():
+    def tanh():
         activation = lambda x: np.tanh(x)
         activation_prime = lambda x: 1 - np.square(np.tanh(x))
-        # activation_prime = lambda x: 1 - np.tanh(x) ** 2
         return activation, activation_prime
 
     @staticmethod
-    def get_leaky_relu(alpha=0.01):
+    def leaky_relu(alpha=0.01):
         activation = lambda x: np.where(x >= 0, x, alpha * x)
         activation_prime = lambda x: np.where(x >= 0, 1, alpha)
         return activation, activation_prime
 
     @staticmethod
-    def get_identity():
-        activation = lambda x: x
-        activation_prime = lambda x: 1
-        return activation, activation_prime
-
-    @staticmethod
-    def get_sigmoid():
+    def sigmoid():
         activation = lambda x: 1 / (1 + np.exp(-x))
         activation_prime = lambda x: activation(x) * (1 - activation(x))
         return activation, activation_prime
 
     @staticmethod
-    def get_softmax():
+    def softmax():
         def softmax(x):
             e_x = np.exp(x - np.max(x))
             return e_x / e_x.sum(axis=0)
@@ -68,13 +60,11 @@ class Activation:
 class Dense:
 
     def __init__(self, input_size, output_size):
-        self.input_size = input_size
-        self.output_size = output_size
         self.weights = np.random.randn(output_size, input_size) * \
                        np.sqrt(2. / input_size)
         self.bias = np.random.randn(output_size, 1)
         self.weights_gradients = np.zeros((output_size, input_size))
-        self.output_gradients = np.zeros((output_size, 1))
+        self.bias_gradients = np.zeros((output_size, 1))
 
     def forward(self, input):
         self.input = input
@@ -83,14 +73,14 @@ class Dense:
     def backward(self, output_gradient):
         weights_gradient = np.dot(output_gradient, self.input.T)
         self.weights_gradients += weights_gradient
-        self.output_gradients += output_gradient
+        self.bias_gradients += output_gradient
         return np.dot(self.weights.T, output_gradient)
 
     def gradient_descent(self, learning_rate, batch_size):
         self.weights -= learning_rate * self.weights_gradients / batch_size
-        self.bias -= learning_rate * self.output_gradients / batch_size
+        self.bias -= learning_rate * self.bias_gradients / batch_size
         self.weights_gradients = np.zeros_like(self.weights_gradients)
-        self.output_gradients = np.zeros_like(self.output_gradients)
+        self.bias_gradients = np.zeros_like(self.bias_gradients)
 
 
 class Network:
@@ -105,78 +95,96 @@ class Network:
         return input
 
 
-class Trainer:
+class Evaluator:
 
-    def __init__(self, neural_network, dataset):
+    def __init__(self, neural_network, testing_set):
         self.nn = neural_network
-        self.training_data, self.testing_data = dataset
+        self.dataset = testing_set
+        self.highest_accuracy = 0
+        self.highest_acc_epoch = 0
 
-    # @staticmethod
-    # def mse(y_pred, y_true):
-        # return np.mean(np.power(y_true - y_pred, 2))
-
-    # @staticmethod
-    # def mse_prime(y_pred, y_true):
-        # return 2 * (y_pred - np.expand_dims(y_true, -1)) / np.size(y_true)
 
     @staticmethod
-    def cel(y_pred, y_true):
+    def cross_entropy_loss(y_pred, y_true):
         y_true = np.expand_dims(y_true, -1)  # ensure correct shape
         return -np.sum(y_true * np.log(y_pred))
 
     @staticmethod
-    def cel_prime(y_pred, y_true):
-        y_true = np.expand_dims(y_true, -1)  # ensure correct shape
+    def classified_correctly(y_pred, y_true):
+        return np.argmax(y_pred) == np.argmax(y_true)
+
+    @staticmethod
+    def print_report(e, error, accuracy):
+        print('%d/%d, error=%f, acc=%f' % (e + 1, epochs, error, accuracy))
+
+    def log_report(self, learning_rate, batch_size):
+        formatted_time = time.strftime("%H:%M:%S", time.localtime(time.time()))
+        log_out = f'time:{formatted_time:<9} ' \
+                  f'lrate:{learning_rate:<6} ' \
+                  f'bsize:{batch_size:<3} ' \
+                  f'epoch:{self.highest_acc_epoch:<3} ' \
+                  f'acc:{self.highest_accuracy:<6}'
+        logging.info(log_out)
+
+    def evaluate_nn(self, trainer, e, learning_rate, epochs, batch_size):
+        error = 0
+        accuracy = 0
+        for x, y_true in self.dataset:
+            y_pred = nn.forward(x)
+            error += self.cross_entropy_loss(y_pred, y_true)
+            accuracy += self.classified_correctly(y_pred, y_true)
+        error /= len(self.dataset)
+        accuracy /= len(self.dataset)
+        if accuracy > self.highest_accuracy:
+            self.highest_accuracy = accuracy
+            self.highest_acc_epoch = e
+        if trainer.reports:
+            self.print_report(e, error, accuracy)
+        if trainer.log_results and e + 1 == epochs:
+            self.log_report(learning_rate, batch_size)
+
+
+class Trainer:
+
+    def __init__(self, neural_network, evaluator, training_set):
+        self.nn = neural_network
+        self.ev = evaluator
+        self.dataset = training_set
+
+    @staticmethod
+    def cross_entropy_loss_prime(y_pred, y_true):
+        y_true = np.expand_dims(y_true, -1)
         return y_pred - y_true
 
     def backward(self, gradient):
         for layer in reversed(self.nn.layers):
             gradient = layer.backward(gradient)
 
-    @staticmethod
-    def classified_correctly(y_pred, y_true):
-        return np.argmax(y_pred) == np.argmax(y_true)
-
-    def evaluate_network(self, e, epochs):
-        error = 0
-        accuracy = 0
-        for x, y_true in self.testing_data:
-            y_pred = nn.forward(x)
-            error += self.cel(y_pred, y_true)
-            # error += self.mse(y_pred, y_true)
-            accuracy += self.classified_correctly(y_pred, y_true)
-        error /= len(self.testing_data)
-        accuracy /= len(self.testing_data)
-        print('%d/%d, error=%f, acc=%f' % (e + 1, epochs, error, accuracy))
-        return accuracy
-
     def gradient_descent(self, learning_rate, batch_size):
         for layer in self.nn.layers:
             layer.gradient_descent(learning_rate, batch_size)
 
+    @staticmethod
+    def split_into_batches(dataset, batch_size):
+        samples_length = len(dataset)
+        return [
+            dataset[i:i + batch_size]
+            for i in range(0, samples_length, batch_size)
+            if i + batch_size <= samples_length]
+
     def train(self, learning_rate, epochs, batch_size):
-        highest_accuracy = 0
-        highest_epoch = 0
         for e in range(epochs):
-            random.shuffle(self.training_data)
-            samples_length = len(self.training_data)
-            mini_batches = [
-                self.training_data[i:i + batch_size]
-                for i in range(0, samples_length, batch_size)
-                if i + batch_size <= samples_length]
+            random.shuffle(self.dataset)
+            mini_batches = self.split_into_batches(self.dataset, batch_size)
             for mini_batch in mini_batches:
                 for x, y_true in mini_batch:
                     y_pred = self.nn.forward(x)
-                    gradient = self.cel_prime(y_pred, y_true)
-                    # gradient = self.mse_prime(y_pred, y_true)
+                    gradient = self.cross_entropy_loss_prime(y_pred, y_true)
                     self.backward(gradient)
                 self.gradient_descent(learning_rate, batch_size)
-            accuracy = self.evaluate_network(e, epochs)
-            if accuracy > highest_accuracy:
-                highest_accuracy = accuracy
-                highest_epoch = e + 1
-                print("new best")
-        return highest_accuracy, highest_epoch
+            if self.reports or self.log_results:
+                params = learning_rate, epochs, batch_size
+                self.ev.evaluate_nn(self, e, *params)
 
 
 def xor_dataset():
@@ -190,26 +198,37 @@ def mnist_dataset():
         return pickle.load(f)
 
 
+training_set, testing_set = mnist_dataset()
+
 script_dir = os.path.dirname(os.path.realpath(__file__))
 log_file_path = os.path.join(script_dir, 'tests.log')
-logging.basicConfig(filename=log_file_path, level=logging.INFO, format='%(message)s')
+logging.basicConfig(filename=log_file_path,
+                    level=logging.INFO,
+                    format='%(message)s')
 while True:
     nn = Network(
         Dense(784, 16),
-        Activation(Activation.get_tanh()),
+        Activation(Activation.tanh()),
         Dense(16, 16),
-        Activation(Activation.get_tanh()),
+        Activation(Activation.tanh()),
         Dense(16, 10),
-        Activation(Activation.get_softmax()))
-    trainer = Trainer(nn, mnist_dataset())
+        Activation(Activation.softmax()))
+    evaluator = Evaluator(nn, testing_set)
+    trainer = Trainer(nn, evaluator, training_set)
+    trainer.log_results = True
     learning_rate = round(random.uniform(0.001, 0.1), 3)
     epochs = 100
     batch_size = random.choice([1, random.randint(2, 32)])
-    accuracy, epoch = trainer.train(learning_rate, epochs, batch_size)
-    formatted_time = time.strftime("%H:%M:%S", time.localtime(time.time()))
-    log_out = f'time:{formatted_time:<9} ' \
-              f'lrate:{learning_rate:<6} ' \
-              f'bsize:{batch_size:<3} ' \
-              f'epoch:{epoch:<3} ' \
-              f'acc:{accuracy:<6}'
-    logging.info(log_out)
+    trainer.train(learning_rate, epochs, batch_size)
+
+
+
+'''
+@staticmethod
+def mse(y_pred, y_true):
+return np.mean(np.power(y_true - y_pred, 2))
+
+@staticmethod
+def mse_prime(y_pred, y_true):
+return 2 * (y_pred - np.expand_dims(y_true, -1)) / np.size(y_true)
+'''
