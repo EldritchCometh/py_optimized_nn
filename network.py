@@ -103,7 +103,6 @@ class Evaluator:
         self.highest_accuracy = 0
         self.highest_acc_epoch = 0
 
-
     @staticmethod
     def cross_entropy_loss(y_pred, y_true):
         y_true = np.expand_dims(y_true, -1)  # ensure correct shape
@@ -115,7 +114,7 @@ class Evaluator:
 
     @staticmethod
     def print_report(e, error, accuracy):
-        print('%d/%d, error=%f, acc=%f' % (e + 1, epochs, error, accuracy))
+        print('%d/%d, error=%f, acc=%f' % (e, epochs, error, accuracy))
 
     def log_report(self, learning_rate, batch_size):
         formatted_time = time.strftime("%H:%M:%S", time.localtime(time.time()))
@@ -126,7 +125,7 @@ class Evaluator:
                   f'acc:{self.highest_accuracy:<6}'
         logging.info(log_out)
 
-    def evaluate_nn(self, trainer, e, learning_rate, epochs, batch_size):
+    def evaluate_nn(self, trainer, learning_rate, epochs, batch_size, e):
         error = 0
         accuracy = 0
         for x, y_true in self.dataset:
@@ -140,7 +139,7 @@ class Evaluator:
             self.highest_acc_epoch = e
         if trainer.reports:
             self.print_report(e, error, accuracy)
-        if trainer.log_results and e + 1 == epochs:
+        if trainer.log_results and e == epochs:
             self.log_report(learning_rate, batch_size)
 
 
@@ -175,7 +174,7 @@ class Trainer:
             if i + batch_size <= samples_length]
 
     def train(self, learning_rate, epochs, batch_size):
-        for e in range(epochs):
+        for e in range(1, epochs+1):
             random.shuffle(self.dataset)
             mini_batches = self.split_into_batches(self.dataset, batch_size)
             for mini_batch in mini_batches:
@@ -185,8 +184,7 @@ class Trainer:
                     self.backward(gradient)
                 self.gradient_descent(learning_rate, batch_size)
             if self.reports or self.log_results:
-                params = learning_rate, epochs, batch_size
-                self.ev.evaluate_nn(self, e, *params)
+                self.ev.evaluate_nn(self, learning_rate, epochs, batch_size, e)
 
 
 def xor_dataset():
@@ -218,9 +216,9 @@ while True:
     evaluator = Evaluator(nn, testing_set)
     trainer = Trainer(nn, evaluator, training_set)
     trainer.log_results = True
-    learning_rate = round(random.uniform(0.001, 0.1), 3)
+    learning_rate = round(random.uniform(0.0001, 0.7), 3)
     epochs = 100
-    batch_size = random.choice([1, random.randint(2, 32)])
+    batch_size = random.randint(1, 32)
     trainer.train(learning_rate, epochs, batch_size)
 
 
